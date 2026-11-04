@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Changer le mot de passe</title>
+    <link rel="stylesheet" href="../CSS/terminal.css">
+    <style>
+        body { background: #000; margin: 0; padding: 2em; }
+        .hidden { display: none; }
+        .field { background: #000; color: #80FF80; border: 1px solid #80FF80; font-family: inherit; font-size: 1em; padding: .3em .5em; }
+        .field:focus { outline: none; box-shadow: 0 0 6px #80FF80; }
+        button.field { cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="scanline"></div>
+        <div class="text">
+            <p>&gt; OFFICIAL TERMINAL HUMANITY COMMUNICATION SYSTEM</p>
+            <p>&gt; Première connexion détectée : <span id="who"></span></p>
+            <p>&gt; Tu dois choisir un nouveau mot de passe (8 caractères minimum).</p>
+
+            <p>&gt; Nouveau mot de passe : <input id="pw1" class="field" type="password" autocomplete="new-password" autofocus></p>
+            <p>&gt; Confirmation : <input id="pw2" class="field" type="password" autocomplete="new-password"></p>
+            <p><button id="submit" class="field">[ Valider ]</button></p>
+
+            <p id="error" class="hidden"></p>
+            <p id="ok" class="hidden">&gt; Mot de passe modifié. Redirection...</p>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        const $ = id => document.getElementById(id);
+        const s = Auth.session();
+
+        // Accès réservé aux comptes connectés qui doivent changer leur mot de passe
+        if (!s) location.href = "connexion.html";
+        else if (!s.mustChange) location.href = "connexion.html";
+        else $("who").textContent = s.user;
+
+        function showError(msg) {
+            $("error").textContent = "> ERREUR : " + msg;
+            $("error").classList.remove("hidden");
+        }
+
+        async function valider() {
+            $("error").classList.add("hidden");
+            const a = $("pw1").value, b = $("pw2").value;
+            if (a.length < 8) return showError("8 caractères minimum.");
+            if (a !== b) return showError("Les deux mots de passe ne correspondent pas.");
+            // Interdit de réutiliser le mot de passe temporaire
+            const compte = COMPTES.find(c => c.user.toLowerCase() === s.user.toLowerCase());
+            if (compte && await Auth.hash(s.user, a) === compte.hash)
+                return showError("Choisis un mot de passe différent du mot de passe temporaire.");
+
+            $("submit").disabled = true;
+            try {
+                await Auth.changePassword(a);
+                $("ok").classList.remove("hidden");
+                setTimeout(() => location.href = "connexion.html", 1200);
+            } catch (e) {
+                showError(e.message);
+                $("submit").disabled = false;
+            }
+        }
+
+        $("submit").addEventListener("click", valider);
+        $("pw2").addEventListener("keydown", e => { if (e.key === "Enter") valider(); });
+    </script>
+</body>
+</html>

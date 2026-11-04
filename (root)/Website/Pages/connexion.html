@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Connexion</title>
+    <link rel="stylesheet" href="../CSS/terminal.css">
+    <style>
+        body { background: #000; margin: 0; padding: 2em; }
+        .hidden { display: none; }
+        .field { background: #000; color: #80FF80; border: 1px solid #80FF80; font-family: inherit; font-size: 1em; padding: .3em .5em; }
+        .field:focus { outline: none; box-shadow: 0 0 6px #80FF80; }
+        button.field { cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="scanline"></div>
+        <div class="text">
+            <p>&gt; OFFICIAL TERMINAL HUMANITY COMMUNICATION SYSTEM</p>
+            <p>&gt; Authentification requise.</p>
+
+            <div id="login-zone">
+                <p>&gt; Identifiant : <input id="user" class="field" type="text" autocomplete="username" autofocus></p>
+                <p>&gt; Mot de passe : <input id="pw" class="field" type="password" autocomplete="current-password"></p>
+                <p><button id="submit" class="field">[ Se connecter ]</button></p>
+            </div>
+
+            <div id="user-zone" class="hidden">
+                <p>&gt; Connecté en tant que :</p>
+                <p id="username"></p>
+                <p><a id="logout" class="newpage" href="#">[ Se déconnecter ]</a></p>
+            </div>
+
+            <p id="error" class="hidden"></p>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        const $ = id => document.getElementById(id);
+        let echecs = 0;
+
+        function showError(msg) {
+            $("error").textContent = "> ERREUR : " + msg;
+            $("error").classList.remove("hidden");
+        }
+
+        function showUser(s) {
+            $("username").textContent = "> " + s.user;
+            $("login-zone").classList.add("hidden");
+            $("user-zone").classList.remove("hidden");
+        }
+
+        async function connexion() {
+            $("error").classList.add("hidden");
+            if (!$("user").value || !$("pw").value) { showError("Identifiant et mot de passe requis."); return; }
+            $("submit").disabled = true;
+            const ok = await Auth.login($("user").value, $("pw").value);
+            if (ok) {
+                const s = Auth.session();
+                if (s.mustChange) { location.href = "changer-mdp.html"; return; }
+                showUser(s);
+            } else {
+                echecs++;
+                showError("Identifiant ou mot de passe incorrect.");
+                // Ralentit les essais répétés
+                await new Promise(r => setTimeout(r, Math.min(echecs, 5) * 800));
+                $("pw").value = "";
+            }
+            $("submit").disabled = false;
+        }
+
+        $("submit").addEventListener("click", connexion);
+        $("pw").addEventListener("keydown", e => { if (e.key === "Enter") connexion(); });
+        $("user").addEventListener("keydown", e => { if (e.key === "Enter") $("pw").focus(); });
+        $("logout").addEventListener("click", e => { e.preventDefault(); Auth.logout(); location.reload(); });
+
+        // Déjà connecté ?
+        const s = Auth.session();
+        if (s) { if (s.mustChange) location.href = "changer-mdp.html"; else showUser(s); }
+    </script>
+</body>
+</html>
