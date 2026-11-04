@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Connexion</title>
+    <link rel="stylesheet" href="../CSS/terminal.css">
+    <style>
+        body { background: #000; margin: 0; padding: 2em; }
+        .avatar { width: 64px; height: 64px; border-radius: 50%; border: 2px solid #80FF80; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="scanline"></div>
+        <div class="text">
+            <p>&gt; OFFICIAL TERMINAL HUMANITY COMMUNICATION SYSTEM</p>
+            <p>&gt; Authentification requise.</p>
+
+            <p id="login-zone"><a id="discord-link" class="newpage" href="#">[ Se connecter avec Discord ]</a></p>
+
+            <div id="user-zone" class="hidden">
+                <p>&gt; Connecté en tant que :</p>
+                <p><img id="avatar" class="avatar" alt="avatar"></p>
+                <p id="username"></p>
+                <p><a id="logout" class="newpage" href="#">[ Se déconnecter ]</a></p>
+            </div>
+
+            <p id="error" class="hidden"></p>
+        </div>
+    </div>
+
+    <script>
+        // ====== À MODIFIER ======
+        const CLIENT_ID = "TON_CLIENT_ID_DISCORD";
+        // ========================
+
+        // L'URL de cette page doit être ajoutée EXACTEMENT dans le portail Discord (OAuth2 > Redirects)
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+        const loginZone = document.getElementById("login-zone");
+        const userZone = document.getElementById("user-zone");
+        const errorBox = document.getElementById("error");
+
+        function showError(msg) {
+            errorBox.textContent = "> ERREUR : " + msg;
+            errorBox.classList.remove("hidden");
+        }
+
+        function showUser(user) {
+            document.getElementById("username").textContent = "> " + (user.global_name || user.username);
+            const avatar = document.getElementById("avatar");
+            if (user.avatar) {
+                avatar.src = "https://cdn.discordapp.com/avatars/" + user.id + "/" + user.avatar + ".png?size=128";
+            } else {
+                avatar.classList.add("hidden");
+            }
+            loginZone.classList.add("hidden");
+            userZone.classList.remove("hidden");
+        }
+
+        async function fetchUser(token) {
+            const res = await fetch("https://discord.com/api/users/@me", {
+                headers: { Authorization: "Bearer " + token }
+            });
+            if (!res.ok) throw new Error("Session Discord invalide ou expirée.");
+            return res.json();
+        }
+
+        // Lien de connexion (avec un "state" aléatoire contre les falsifications)
+        document.getElementById("discord-link").addEventListener("click", function (e) {
+            e.preventDefault();
+            if (CLIENT_ID.startsWith("TON_")) { showError("CLIENT_ID Discord non configuré."); return; }
+            const state = crypto.randomUUID();
+            sessionStorage.setItem("oauth_state", state);
+            const params = new URLSearchParams({
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
+                response_type: "token",
+                scope: "identify",
+                state: state
+            });
+            window.location.href = "https://discord.com/oauth2/authorize?" + params.toString();
+        });
+
+        document.getElementById("logout").addEventListener("click", function (e) {
+            e.preventDefault();
+            sessionStorage.removeItem("discord_token");
+            window.location.reload();
+        });
+
+        (async function init() {
+            const hash = new URLSearchParams(window.location.hash.slice(1));
+            let token = null;
+
+            if (hash.has("access_token")) {
+                // Retour de Discord après autorisation
+                if (hash.get("state") !== sessionStorage.getItem("oauth_state")) {
+                    showError("Vérification de sécurité échouée. Réessaie.");
+                    return;
+                }
+                token = hash.get("access_token");
+                sessionStorage.setItem("discord_token", token);
+                sessionStorage.removeItem("oauth_state");
+                history.replaceState(null, "", window.location.pathname); // enlève le token de l'URL
+            } else if (hash.has("error")) {
+                showError("Connexion annulée ou refusée.");
+                history.replaceState(null, "", window.location.pathname);
+                return;
+            } else {
+                token = sessionStorage.getItem("discord_token");
+            }
+
+            if (token) {
+                try {
+                    showUser(await fetchUser(token));
+                } catch (err) {
+                    sessionStorage.removeItem("discord_token");
+                    showError(err.message);
+                }
+            }
+        })();
+    </script>
+</body>
+</html>
